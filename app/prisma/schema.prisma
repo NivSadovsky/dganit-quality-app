@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Postgres (Railway), both locally and in production — see .env for
+// DATABASE_URL. Enums are avoided even though Postgres supports them,
+// so local dev could fall back to SQLite if ever needed without a schema
+// rewrite; string constants are validated in app code instead — see
+// src/lib/constants.ts
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique // personal 9-digit login code
+  role      String   @default("INSPECTOR") // INSPECTOR | ADMIN
+  createdAt DateTime @default(now())
+
+  purchaseOrders PurchaseOrder[]
+  inspections    Inspection[]
+}
+
+model PurchaseOrder {
+  id              String    @id @default(cuid())
+  orderNumber     String    @unique // e.g. "381371", from the PO title
+  containerNumber String? // ISO container number, e.g. "GAOU6093763"
+  deliveryDate    DateTime?
+  sourceFileName  String
+  createdAt       DateTime  @default(now())
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  items OrderItem[]
+}
+
+model ProductMaster {
+  // Placeholder shape until the real product Excel arrives — fields taken
+  // from the sample QC form's general-details section. Expect to extend
+  // this model once the real column list is known.
+  id               String   @id @default(cuid())
+  itemCode         String   @unique // ברקוד / קוד פריט — matches OrderItem.itemCode
+  description      String
+  itemCodeSadovsky String? // קוד פריט סדובסקי
+  customerItemCode String? // קוד פריט לקוח
+  specDimensions   String? // מידות לפי מפרט
+  specWeight       String? // משקל לפי מפרט
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  orderItems OrderItem[]
+}
+
+model OrderItem {
+  id          String @id @default(cuid())
+  rowIndex    Int // original row order in the PO
+  itemCode    String? // blank when the PO row had no barcode
+  description String
+  quantity    Int
+
+  decision            String  @default("PENDING") // PENDING | INSPECT | SKIP
+  needsCodeAssignment Boolean @default(false) // true when itemCode was missing at import
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+
+  productMasterId String?
+  productMaster   ProductMaster? @relation(fields: [productMasterId], references: [id])
+
+  inspections Inspection[]
+}
+
+// Singleton counter so inspection serial numbers are a single global
+// sequence starting at 23456, independent of DB-specific autoincrement.
+model InspectionCounter {
+  id         Int @id @default(1)
+  nextSerial Int @default(23456)
+}
+
+model Inspection {
+  id           String    @id @default(cuid())
+  serialNumber Int       @unique
+  status       String    @default("OPEN") // OPEN | CLOSED
+  createdAt    DateTime  @default(now())
+  closedAt     DateTime?
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  inspectorId String
+  inspector   User   @relation(fields: [inspectorId], references: [id])
+
+  // General details — snapshotted at inspection time so the printed report
+  // stays stable even if master/PO data changes later.
+  productDescription String
+  itemCodeSadovsky   String?
+  specDimensions     String?
+  specWeight         String?
+  orderOrContainer   String?
+
+  // Sample details
+  qtyToInspect     Int?
+  cartonsToInspect Int?
+  qtyInOrder       Int?
+  customerItemCode String?
+
+  conclusions String? // free text
+
+  pdfUrl String? // set once the report is generated on close
+
+  checkItems   InspectionCheckItem[]
+  measurements InspectionMeasurement[]
+  findings     InspectionFinding[]
+  photos       InspectionPhoto[]
+}
+
+// The תקין/לא תקין/הערות rows across the packaging / visual / product
+// sections of the form. Seeded from a fixed default set per inspection
+// (see src/lib/inspectionTemplate.ts) — editable per row.
+model InspectionCheckItem {
+  id      String  @id @default(cuid())
+  order   Int
+  section String // PACKAGING | VISUAL | PRODUCT
+  label   String // e.g. "קרטון חיצוני"
+  result  String  @default("NA") // OK | NOT_OK | NA
+  note    String?
+
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+}
+
+// מידות ומשקלים — dynamic rows, one per sampled unit
+model InspectionMeasurement {
+  id          String  @id @default(cuid())
+  order       Int
+  unitWeightG Float?
+  widthCm     Float?
+  lengthCm    Float?
+  color       String?
+
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+}
+
+// פירוט ממצאי הבדיקה — free-add rows, each with its own severity
+model InspectionFinding {
+  id       String @id @default(cuid())
+  order    Int
+  text     String
+  severity String @default("LOW") // LOW | MEDIUM | HIGH
+
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+}
+
+model InspectionPhoto {
+  id        String   @id @default(cuid())
+  order     Int
+  url       String
+  note      String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  inspectionId String
+  inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+}
