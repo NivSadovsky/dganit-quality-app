@@ -51,6 +51,12 @@ export function TranslateForm({ inspection }: { inspection: InspectionFull }) {
 
   const notedCheckItems = inspection.checkItems.filter((c) => c.note && c.note.trim());
 
+  const missing =
+    !inspection.inspectorNameEn?.trim() ||
+    (!!inspection.conclusions?.trim() && !inspection.conclusionsEn?.trim()) ||
+    notedCheckItems.some((c) => !c.noteEn?.trim()) ||
+    inspection.findings.some((f) => !f.textEn?.trim());
+
   const onGenerate = () => {
     setDone(false);
     startTransition(async () => {
@@ -118,8 +124,13 @@ export function TranslateForm({ inspection }: { inspection: InspectionFull }) {
         <p className="mb-3 text-sm text-zinc-500">
           צבעים במידות ומשקלים מתורגמים אוטומטית ואינם צריכים תרגום ידני.
         </p>
+        {missing && (
+          <p className="mb-3 text-center text-sm font-medium text-amber-700">
+            יש להשלים תרגום לכל השורות למעלה לפני יצירת הדוח
+          </p>
+        )}
         <button
-          disabled={pending}
+          disabled={pending || missing}
           onClick={onGenerate}
           className="w-full rounded-xl bg-brand px-4 py-3 font-semibold text-white disabled:opacity-60"
         >
