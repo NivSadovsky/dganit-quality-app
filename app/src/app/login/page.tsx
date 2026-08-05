@@ -15,7 +15,7 @@ export default async function LoginPage() {
         </div>
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-zinc-200">
           <h1 className="mb-1 text-center text-xl font-bold text-brand">
-            אייכות ובקלות
+            איכות ובקלות
           </h1>
           <p className="mb-6 text-center text-sm text-zinc-500">
             הזינו את הקוד האישי בן 9 הספרות

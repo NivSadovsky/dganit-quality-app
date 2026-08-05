@@ -1,12 +1,25 @@
-import { Document, Page, View, Text, Image, Font, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import {
+  Document,
+  Page,
+  View,
+  Text,
+  Image,
+  Font,
+  StyleSheet,
+  Svg,
+  Path,
+  renderToBuffer,
+} from "@react-pdf/renderer";
 import { join } from "path";
 import type { InspectionFull } from "@/lib/inspections";
 import { storageAbsPath } from "@/lib/storage";
 import {
   CHECK_SECTION_LABELS_HE,
   CHECK_ROW_LABELS_EN,
+  CHECK_RESULT_LABELS_EN,
   SEVERITY_LABELS_HE,
   SEVERITY_LABELS_EN,
+  colorLabelEn,
   type CheckSection,
 } from "@/lib/constants";
 
@@ -21,8 +34,8 @@ Font.register({
 });
 
 const styles = StyleSheet.create({
-  page: { padding: 28, fontFamily: "Heebo", fontSize: 9, direction: "rtl" },
-  pageEn: { padding: 28, fontFamily: "Heebo", fontSize: 9, direction: "ltr" },
+  page: { padding: 28, fontFamily: "Heebo", fontSize: 9, direction: "rtl", textAlign: "right" },
+  pageEn: { padding: 28, fontFamily: "Heebo", fontSize: 9, direction: "ltr", textAlign: "left" },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -43,6 +56,17 @@ const styles = StyleSheet.create({
     padding: 4,
     marginTop: 10,
     marginBottom: 4,
+    textAlign: "right",
+  },
+  sectionTitleEn: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#0b2f6b",
+    backgroundColor: "#eef2fb",
+    padding: 4,
+    marginTop: 10,
+    marginBottom: 4,
+    textAlign: "left",
   },
   kvGrid: { flexDirection: "row", flexWrap: "wrap" },
   kvItem: { width: "50%", flexDirection: "row", paddingVertical: 2, gap: 4 },
@@ -57,6 +81,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#f4f6fb",
     padding: 4,
     fontWeight: "bold",
+    textAlign: "right",
+  },
+  thEn: {
+    flex: 1,
+    borderRight: "0.5pt solid #ccc",
+    borderBottom: "0.5pt solid #ccc",
+    backgroundColor: "#f4f6fb",
+    padding: 4,
+    fontWeight: "bold",
+    textAlign: "left",
   },
   tdOk: { backgroundColor: "#e8f5e9", textAlign: "center", fontWeight: "bold", color: "#2e7d32" },
   tdNotOk: { backgroundColor: "#ffebee", textAlign: "center", fontWeight: "bold", color: "#c62828" },
@@ -65,10 +99,18 @@ const styles = StyleSheet.create({
     borderRight: "0.5pt solid #ccc",
     borderBottom: "0.5pt solid #ccc",
     padding: 4,
+    textAlign: "right",
+  },
+  tdEn: {
+    flex: 1,
+    borderRight: "0.5pt solid #ccc",
+    borderBottom: "0.5pt solid #ccc",
+    padding: 4,
+    textAlign: "left",
   },
   tdLabel: { flex: 2 },
-  tdNarrow: { flex: 0.8 },
-  conclusions: { marginTop: 4, lineHeight: 1.4 },
+  conclusions: { marginTop: 4, lineHeight: 1.4, textAlign: "right" },
+  conclusionsEn: { marginTop: 4, lineHeight: 1.4, textAlign: "left" },
   photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
   photoBox: { width: 150 },
   photo: { width: 150, height: 150, objectFit: "cover", borderRadius: 4 },
@@ -82,6 +124,10 @@ const styles = StyleSheet.create({
     color: "#999",
     textAlign: "center",
   },
+  signatureBlock: { marginTop: 28, alignItems: "center" },
+  signatureName: { fontSize: 9, fontWeight: "bold", color: "#222", textAlign: "center" },
+  signatureTitle: { fontSize: 8, color: "#555", textAlign: "center" },
+  signatureLogo: { width: 90, height: 28, marginTop: 6 },
 });
 
 const CHECK_SECTIONS: CheckSection[] = ["PACKAGING", "VISUAL", "PRODUCT"];
@@ -102,6 +148,27 @@ function formatDate(d: Date) {
   return new Intl.DateTimeFormat("he-IL").format(d);
 }
 
+function SignatureBlock() {
+  const logoPath = join(process.cwd(), "public", "logo.png");
+  return (
+    <View style={styles.signatureBlock}>
+      <Svg width={140} height={36} viewBox="0 0 140 36">
+        <Path
+          d="M6,26 C14,6 20,32 28,16 C34,4 40,30 48,14 C54,4 58,26 66,18 C72,12 76,24 84,14 C90,6 94,22 102,16 C108,12 112,20 120,10 C124,6 128,14 134,8"
+          stroke="#1a2a5e"
+          strokeWidth={1.4}
+          fill="none"
+        />
+      </Svg>
+      <Text style={styles.signatureName}>דגנית חגי</Text>
+      <Text style={styles.signatureTitle}>מנהלת איכות, סדובסקי בע&quot;מ</Text>
+      <Text style={styles.signatureTitle}>חוצות היוצר 13ב&#39;, אשקלון</Text>
+      {/* eslint-disable-next-line jsx-a11y/alt-text */}
+      <Image src={logoPath} style={styles.signatureLogo} />
+    </View>
+  );
+}
+
 export async function renderInspectionPdf(inspection: InspectionFull): Promise<Buffer> {
   const logoPath = join(process.cwd(), "public", "logo.png");
   const photos = inspection.photos.map((p) => ({
@@ -110,17 +177,13 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
   }));
 
   const doc = (
-    <Document
-      title={`דוח בקרת אייכות ${inspection.serialNumber}`}
-      author="Sadovsky Ltd"
-    >
-      {/* ---------------- Hebrew page ---------------- */}
+    <Document title={`דוח בקרת איכות ${inspection.serialNumber}`} author="Sadovsky Ltd">
       <Page size="A4" style={styles.page} wrap>
         <View style={styles.headerRow}>
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image src={logoPath} style={styles.logo} />
           <View>
-            <Text style={styles.title}>דוח בקרת אייכות</Text>
+            <Text style={styles.title}>דוח בקרת איכות</Text>
             <Text style={styles.meta}>מספר סידורי: {inspection.serialNumber}</Text>
             <Text style={styles.meta}>תאריך: {formatDate(inspection.createdAt)}</Text>
           </View>
@@ -207,7 +270,9 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
               {inspection.findings.map((f) => (
                 <View style={styles.tr} key={f.id}>
                   <Text style={[styles.td, { flex: 3 }]}>{pdfSafe(f.text)}</Text>
-                  <Text style={styles.td}>{SEVERITY_LABELS_HE[f.severity as keyof typeof SEVERITY_LABELS_HE]}</Text>
+                  <Text style={styles.td}>
+                    {SEVERITY_LABELS_HE[f.severity as keyof typeof SEVERITY_LABELS_HE]}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -232,10 +297,25 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
           </View>
         )}
 
+        <SignatureBlock />
+
         <Text style={styles.footer} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
       </Page>
+    </Document>
+  );
 
-      {/* ---------------- English page ---------------- */}
+  return renderToBuffer(doc);
+}
+
+export async function renderInspectionEnglishPdf(inspection: InspectionFull): Promise<Buffer> {
+  const logoPath = join(process.cwd(), "public", "logo.png");
+  const photos = inspection.photos.map((p) => ({
+    ...p,
+    absPath: storageAbsPath(p.url),
+  }));
+
+  const doc = (
+    <Document title={`Quality Control Report ${inspection.serialNumber}`} author="Sadovsky Ltd">
       <Page size="A4" style={styles.pageEn} wrap>
         <View style={[styles.headerRow, { flexDirection: "row-reverse" }]}>
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
@@ -246,22 +326,18 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
             <Text style={styles.metaEn}>Date: {formatDate(inspection.createdAt)}</Text>
           </View>
         </View>
-        <Text style={{ fontSize: 8, color: "#888", marginBottom: 8 }}>
-          Labels below are translated; free-text fields are shown as entered (Hebrew) until
-          machine translation is configured.
-        </Text>
 
-        <Text style={styles.sectionTitle}>General Details</Text>
+        <Text style={styles.sectionTitleEn}>General Details</Text>
         <View style={styles.kvGrid}>
           <KV label="Product description" value={inspection.productDescription} ltr />
-          <KV label="Sadovsky item code" value={inspection.itemCodeSadovsky} ltr />
+          <KV label="SKU" value={inspection.itemCodeSadovsky} ltr />
           <KV label="Spec dimensions" value={inspection.specDimensions} ltr />
           <KV label="Spec weight" value={inspection.specWeight} ltr />
           <KV label="Order / container number" value={inspection.orderOrContainer} ltr />
-          <KV label="Inspector" value={inspection.inspector.name} ltr />
+          <KV label="Inspector" value={inspection.inspectorNameEn || inspection.inspector.name} ltr />
         </View>
 
-        <Text style={styles.sectionTitle}>Sample Details</Text>
+        <Text style={styles.sectionTitleEn}>Sample Details</Text>
         <View style={styles.kvGrid}>
           <KV label="Qty to inspect" value={inspection.qtyToInspect?.toString()} ltr />
           <KV label="Cartons to inspect" value={inspection.cartonsToInspect?.toString()} ltr />
@@ -272,29 +348,33 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
         {CHECK_SECTIONS.map((section) => {
           const rows = inspection.checkItems.filter((c) => c.section === section);
           if (rows.length === 0) return null;
-          const titleEn = { PACKAGING: "Packaging", VISUAL: "Carton Visual Check", PRODUCT: "Product Results" }[section];
+          const titleEn = {
+            PACKAGING: "Packaging",
+            VISUAL: "Carton Visual Check",
+            PRODUCT: "Product Results",
+          }[section];
           return (
             <View key={section}>
-              <Text style={styles.sectionTitle}>{titleEn}</Text>
+              <Text style={styles.sectionTitleEn}>{titleEn}</Text>
               <View style={styles.table}>
                 <View style={styles.tr}>
-                  <Text style={[styles.th, styles.tdLabel]}></Text>
-                  <Text style={styles.th}>OK</Text>
-                  <Text style={styles.th}>Not OK</Text>
-                  <Text style={[styles.th, { flex: 2 }]}>Notes</Text>
+                  <Text style={[styles.thEn, styles.tdLabel]}></Text>
+                  <Text style={styles.thEn}>{CHECK_RESULT_LABELS_EN.OK}</Text>
+                  <Text style={styles.thEn}>{CHECK_RESULT_LABELS_EN.NOT_OK}</Text>
+                  <Text style={[styles.thEn, { flex: 2 }]}>Notes</Text>
                 </View>
                 {rows.map((row) => (
                   <View style={styles.tr} key={row.id}>
-                    <Text style={[styles.td, styles.tdLabel]}>
+                    <Text style={[styles.tdEn, styles.tdLabel]}>
                       {CHECK_ROW_LABELS_EN[row.label] ?? row.label}
                     </Text>
-                    <Text style={[styles.td, row.result === "OK" ? styles.tdOk : {}]}>
+                    <Text style={[styles.tdEn, row.result === "OK" ? styles.tdOk : {}]}>
                       {row.result === "OK" ? "V" : ""}
                     </Text>
-                    <Text style={[styles.td, row.result === "NOT_OK" ? styles.tdNotOk : {}]}>
+                    <Text style={[styles.tdEn, row.result === "NOT_OK" ? styles.tdNotOk : {}]}>
                       {row.result === "NOT_OK" ? "X" : ""}
                     </Text>
-                    <Text style={[styles.td, { flex: 2 }]}>{pdfSafe(row.note)}</Text>
+                    <Text style={[styles.tdEn, { flex: 2 }]}>{pdfSafe(row.noteEn || row.note)}</Text>
                   </View>
                 ))}
               </View>
@@ -304,20 +384,20 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
 
         {inspection.measurements.length > 0 && (
           <View>
-            <Text style={styles.sectionTitle}>Measurements</Text>
+            <Text style={styles.sectionTitleEn}>Measurements</Text>
             <View style={styles.table}>
               <View style={styles.tr}>
-                <Text style={styles.th}>Unit weight (g)</Text>
-                <Text style={styles.th}>Width (cm)</Text>
-                <Text style={styles.th}>Length (cm)</Text>
-                <Text style={styles.th}>Color</Text>
+                <Text style={styles.thEn}>Unit weight (g)</Text>
+                <Text style={styles.thEn}>Width (cm)</Text>
+                <Text style={styles.thEn}>Length (cm)</Text>
+                <Text style={styles.thEn}>Color</Text>
               </View>
               {inspection.measurements.map((m) => (
                 <View style={styles.tr} key={m.id}>
-                  <Text style={styles.td}>{m.unitWeightG ?? ""}</Text>
-                  <Text style={styles.td}>{m.widthCm ?? ""}</Text>
-                  <Text style={styles.td}>{m.lengthCm ?? ""}</Text>
-                  <Text style={styles.td}>{pdfSafe(m.color)}</Text>
+                  <Text style={styles.tdEn}>{m.unitWeightG ?? ""}</Text>
+                  <Text style={styles.tdEn}>{m.widthCm ?? ""}</Text>
+                  <Text style={styles.tdEn}>{m.lengthCm ?? ""}</Text>
+                  <Text style={styles.tdEn}>{colorLabelEn(m.color)}</Text>
                 </View>
               ))}
             </View>
@@ -326,28 +406,32 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
 
         {inspection.findings.length > 0 && (
           <View>
-            <Text style={styles.sectionTitle}>Findings</Text>
+            <Text style={styles.sectionTitleEn}>Findings</Text>
             <View style={styles.table}>
               <View style={styles.tr}>
-                <Text style={[styles.th, { flex: 3 }]}>Finding</Text>
-                <Text style={styles.th}>Severity</Text>
+                <Text style={[styles.thEn, { flex: 3 }]}>Finding</Text>
+                <Text style={styles.thEn}>Severity</Text>
               </View>
               {inspection.findings.map((f) => (
                 <View style={styles.tr} key={f.id}>
-                  <Text style={[styles.td, { flex: 3 }]}>{pdfSafe(f.text)}</Text>
-                  <Text style={styles.td}>{SEVERITY_LABELS_EN[f.severity as keyof typeof SEVERITY_LABELS_EN]}</Text>
+                  <Text style={[styles.tdEn, { flex: 3 }]}>{pdfSafe(f.textEn || f.text)}</Text>
+                  <Text style={styles.tdEn}>
+                    {SEVERITY_LABELS_EN[f.severity as keyof typeof SEVERITY_LABELS_EN]}
+                  </Text>
                 </View>
               ))}
             </View>
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Conclusions</Text>
-        <Text style={styles.conclusions}>{inspection.conclusions ? pdfSafe(inspection.conclusions) : "—"}</Text>
+        <Text style={styles.sectionTitleEn}>Conclusions</Text>
+        <Text style={styles.conclusionsEn}>
+          {inspection.conclusionsEn || inspection.conclusions || "—"}
+        </Text>
 
         {photos.length > 0 && (
           <View>
-            <Text style={styles.sectionTitle}>Photos</Text>
+            <Text style={styles.sectionTitleEn}>Photos</Text>
             <View style={styles.photoGrid}>
               {photos.map((p) => (
                 <View key={p.id} style={styles.photoBox}>
@@ -359,6 +443,8 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
             </View>
           </View>
         )}
+
+        <SignatureBlock />
 
         <Text style={styles.footer} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
       </Page>

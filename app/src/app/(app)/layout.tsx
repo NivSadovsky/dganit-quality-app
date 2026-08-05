@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </Link>
         <div className="flex-1 text-center text-sm font-bold sm:text-2xl">
           <span className="hidden sm:inline">סדובסקי - </span>
-          אייכות ובקלות
+          איכות ובקלות
         </div>
         <div className="flex items-center justify-between gap-3 text-sm sm:justify-end">
           <span className="opacity-90">{user.name}</span>

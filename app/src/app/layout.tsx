@@ -9,13 +9,13 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: "אייכות ובקלות - סדובסקי",
-  description: "אפליקציית בקרת אייכות לבדיקת מכולות - סדובסקי",
+  title: "איכות ובקלות - סדובסקי",
+  description: "אפליקציית בקרת איכות לבדיקת מכולות - סדובסקי",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "אייכות ובקלות",
+    title: "איכות ובקלות",
   },
   icons: {
     icon: [

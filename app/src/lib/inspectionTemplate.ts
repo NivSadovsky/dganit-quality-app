@@ -7,7 +7,6 @@ export const DEFAULT_CHECK_ROWS: { section: CheckSection; label: string }[] = [
   { section: "PACKAGING", label: "קרטון חיצוני" },
   { section: "PACKAGING", label: "בר קוד" },
   { section: "PACKAGING", label: "לוגו" },
-  { section: "PACKAGING", label: "סגירת הקרטון" },
   { section: "PACKAGING", label: "אופן האריזה" },
   { section: "PACKAGING", label: "כמות בקרטון" },
 

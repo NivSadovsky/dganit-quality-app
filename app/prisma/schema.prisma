@@ -113,7 +113,14 @@ model Inspection {
 
   conclusions String? // free text
 
-  pdfUrl String? // set once the report is generated on close
+  // Manual English translations, filled in on-demand via the translate
+  // screen (only needed for the ~5% of inspections where an English report
+  // is required) — see src/app/(app)/orders/[orderId]/items/[itemId]/translate.
+  inspectorNameEn String?
+  conclusionsEn   String?
+
+  pdfUrl   String? // Hebrew report, set once closed
+  pdfUrlEn String? // English report, set once translated and generated
 
   checkItems   InspectionCheckItem[]
   measurements InspectionMeasurement[]
@@ -131,6 +138,7 @@ model InspectionCheckItem {
   label   String // e.g. "קרטון חיצוני"
   result  String  @default("NA") // OK | NOT_OK | NA
   note    String?
+  noteEn  String?
 
   inspectionId String
   inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
@@ -151,10 +159,11 @@ model InspectionMeasurement {
 
 // פירוט ממצאי הבדיקה — free-add rows, each with its own severity
 model InspectionFinding {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   order    Int
   text     String
-  severity String @default("LOW") // LOW | MEDIUM | HIGH
+  textEn   String?
+  severity String  @default("LOW") // LOW | MEDIUM | HIGH
 
   inspectionId String
   inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)

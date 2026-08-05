@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import type { InspectionMeasurement } from "@/generated/prisma/client";
 import { addMeasurementRow, updateMeasurementRow, deleteMeasurementRow } from "./actions";
+import { MEASUREMENT_COLORS } from "@/lib/constants";
 
 export function MeasurementsTable({
   inspectionId,
@@ -34,14 +35,22 @@ export function MeasurementsTable({
               defaultValue={row.lengthCm}
               onSave={(v) => updateMeasurementRow(row.id, { lengthCm: v })}
             />
-            <input
-              placeholder="צבע"
+            <select
               defaultValue={row.color ?? ""}
-              onBlur={(e) =>
-                startTransition(() => updateMeasurementRow(row.id, { color: e.target.value }))
+              onChange={(e) =>
+                startTransition(() =>
+                  updateMeasurementRow(row.id, { color: e.target.value || null })
+                )
               }
               className="rounded-lg border border-zinc-300 px-2 py-1.5 text-xs"
-            />
+            >
+              <option value="">צבע</option>
+              {MEASUREMENT_COLORS.map((c) => (
+                <option key={c.he} value={c.he}>
+                  {c.he}
+                </option>
+              ))}
+            </select>
             <button
               disabled={pending}
               onClick={() => startTransition(() => deleteMeasurementRow(row.id))}

@@ -1,9 +1,10 @@
 import { mkdir, writeFile } from "fs/promises";
-import { join, dirname } from "path";
+import { join, dirname, resolve } from "path";
 
-const STORAGE_ROOT = process.env.STORAGE_DIR
-  ? join(process.cwd(), process.env.STORAGE_DIR)
-  : join(process.cwd(), "storage");
+// resolve() (not join()) so an absolute STORAGE_DIR — e.g. "/data" for the
+// Railway volume mount — is used as-is instead of being nested under cwd
+// (join("/app", "/data") silently produces "/app/data", not "/data").
+const STORAGE_ROOT = resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.STORAGE_DIR ?? "storage");
 
 export async function saveFile(relPath: string, data: Buffer): Promise<string> {
   const absPath = join(STORAGE_ROOT, relPath);

@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { saveFile } from "@/lib/storage";
 import { CHECK_RESULTS, SEVERITIES } from "@/lib/constants";
-import { renderInspectionPdf } from "@/lib/pdf/renderInspectionPdf";
+import { renderInspectionPdf, renderInspectionEnglishPdf } from "@/lib/pdf/renderInspectionPdf";
 import { inspectionInclude } from "@/lib/inspections";
 
 async function revalidateInspection(inspectionId: string) {
@@ -70,7 +70,7 @@ const resultSchema = z.enum(CHECK_RESULTS);
 
 export async function updateCheckItem(
   checkItemId: string,
-  data: { result?: (typeof CHECK_RESULTS)[number]; note?: string }
+  data: { result?: (typeof CHECK_RESULTS)[number]; note?: string; noteEn?: string }
 ) {
   await requireUser();
   const item = await db.inspectionCheckItem.update({
@@ -78,6 +78,7 @@ export async function updateCheckItem(
     data: {
       ...(data.result ? { result: resultSchema.parse(data.result) } : {}),
       ...(data.note !== undefined ? { note: data.note } : {}),
+      ...(data.noteEn !== undefined ? { noteEn: data.noteEn } : {}),
     },
   });
   await revalidateInspection(item.inspectionId);
@@ -120,13 +121,14 @@ export async function addFinding(inspectionId: string) {
 
 export async function updateFinding(
   findingId: string,
-  data: { text?: string; severity?: (typeof SEVERITIES)[number] }
+  data: { text?: string; textEn?: string; severity?: (typeof SEVERITIES)[number] }
 ) {
   await requireUser();
   const finding = await db.inspectionFinding.update({
     where: { id: findingId },
     data: {
       ...(data.text !== undefined ? { text: data.text } : {}),
+      ...(data.textEn !== undefined ? { textEn: data.textEn } : {}),
       ...(data.severity ? { severity: z.enum(SEVERITIES).parse(data.severity) } : {}),
     },
   });
@@ -141,16 +143,20 @@ export async function deleteFinding(findingId: string) {
 
 // ---- photos ----------------------------------------------------------
 
+const MAX_PHOTOS = 10;
+
 export async function uploadPhoto(inspectionId: string, formData: FormData) {
   await requireUser();
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return;
 
+  const count = await db.inspectionPhoto.count({ where: { inspectionId } });
+  if (count >= MAX_PHOTOS) return;
+
   const buffer = Buffer.from(await file.arrayBuffer());
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
   const relPath = await saveFile(`inspection-photos/${inspectionId}/${Date.now()}.${ext}`, buffer);
 
-  const count = await db.inspectionPhoto.count({ where: { inspectionId } });
   await db.inspectionPhoto.create({
     data: { inspectionId, order: count, url: relPath, isPrimary: count === 0 },
   });
@@ -167,6 +173,43 @@ export async function deletePhoto(photoId: string) {
   await requireUser();
   const photo = await db.inspectionPhoto.delete({ where: { id: photoId } });
   await revalidateInspection(photo.inspectionId);
+}
+
+// ---- translation (English report, generated on demand) -----------------
+
+export async function updateInspectionTranslation(
+  inspectionId: string,
+  data: { inspectorNameEn?: string; conclusionsEn?: string }
+) {
+  await requireUser();
+  await db.inspection.update({
+    where: { id: inspectionId },
+    data: {
+      ...(data.inspectorNameEn !== undefined ? { inspectorNameEn: data.inspectorNameEn } : {}),
+      ...(data.conclusionsEn !== undefined ? { conclusionsEn: data.conclusionsEn } : {}),
+    },
+  });
+  await revalidateInspection(inspectionId);
+}
+
+export async function generateEnglishPdf(inspectionId: string) {
+  await requireUser();
+  const inspection = await db.inspection.findUniqueOrThrow({
+    where: { id: inspectionId },
+    include: inspectionInclude,
+  });
+
+  const pdfBuffer = await renderInspectionEnglishPdf(inspection);
+  const relPath = await saveFile(
+    `inspection-reports/${inspection.serialNumber}-en.pdf`,
+    pdfBuffer
+  );
+
+  await db.inspection.update({ where: { id: inspectionId }, data: { pdfUrlEn: relPath } });
+  revalidatePath(
+    `/orders/${inspection.orderItem.purchaseOrderId}/items/${inspection.orderItemId}/translate`
+  );
+  revalidatePath(`/orders/${inspection.orderItem.purchaseOrderId}/items/${inspection.orderItemId}`);
 }
 
 // ---- close ----------------------------------------------------------

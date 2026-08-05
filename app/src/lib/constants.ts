@@ -45,10 +45,9 @@ export const CHECK_ROW_LABELS_EN: Record<string, string> = {
   "קרטון חיצוני": "Outer carton",
   "בר קוד": "Barcode",
   "לוגו": "Logo",
-  "סגירת הקרטון": "Carton closure",
   "אופן האריזה": "Packing method",
   "כמות בקרטון": "Quantity per carton",
-  "תקינות המארז": "Case integrity",
+  "תקינות המארז": "Box Condition",
   "תווית": "Label",
   "משקל": "Weight",
   "אחידות אריזת הצבעים": "Color-packaging uniformity",
@@ -59,5 +58,45 @@ export const CHECK_ROW_LABELS_EN: Record<string, string> = {
   "בדיקת ספיגה": "Absorption test",
   "בדיקת ירידת צבע": "Color-fastness test",
 };
+
+export const CHECK_RESULT_LABELS_EN: Record<string, string> = {
+  OK: "Pass",
+  NOT_OK: "Fail",
+};
+
+// Common product colors, Hebrew name -> English, used as a select dropdown
+// on measurement rows so the PDF's English translation is automatic and
+// never needs a manual-translation entry (see build_status memory).
+export const MEASUREMENT_COLORS: { he: string; en: string }[] = [
+  { he: "לבן", en: "White" },
+  { he: "שחור", en: "Black" },
+  { he: "אדום", en: "Red" },
+  { he: "כחול", en: "Blue" },
+  { he: "כחול כהה", en: "Navy" },
+  { he: "תכלת", en: "Light Blue" },
+  { he: "ירוק", en: "Green" },
+  { he: "ירוק בהיר", en: "Light Green" },
+  { he: "צהוב", en: "Yellow" },
+  { he: "כתום", en: "Orange" },
+  { he: "ורוד", en: "Pink" },
+  { he: "סגול", en: "Purple" },
+  { he: "חום", en: "Brown" },
+  { he: "בז'", en: "Beige" },
+  { he: "אפור", en: "Gray" },
+  { he: "אפור בהיר", en: "Light Gray" },
+  { he: "כסף", en: "Silver" },
+  { he: "זהב", en: "Gold" },
+  { he: "טורקיז", en: "Turquoise" },
+  { he: "בורדו", en: "Burgundy" },
+  { he: "שקוף", en: "Clear / Transparent" },
+  { he: "רב-גוני", en: "Multicolor" },
+  { he: "קרם", en: "Cream" },
+  { he: "פודרה", en: "Powder Pink" },
+];
+
+export function colorLabelEn(colorHe: string | null | undefined): string {
+  if (!colorHe) return "";
+  return MEASUREMENT_COLORS.find((c) => c.he === colorHe)?.en ?? colorHe;
+}
 
 export const INSPECTION_COUNTER_START = 23456;

@@ -5,6 +5,8 @@ import type { InspectionPhoto } from "@/generated/prisma/client";
 import { fileUrl } from "@/lib/fileUrl";
 import { uploadPhoto, updatePhotoNote, deletePhoto } from "./actions";
 
+const MAX_PHOTOS = 10;
+
 export function PhotoGallery({
   inspectionId,
   photos,
@@ -60,22 +62,29 @@ export function PhotoGallery({
           </div>
         ))}
 
-        <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-zinc-300 text-zinc-400 hover:border-brand hover:text-brand">
-          <span className="text-2xl">{uploading ? "…" : "+"}</span>
-          <span className="text-xs">
-            {photos.length === 0 ? "צילום ראשי" : "הוספת תמונה"}
-          </span>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            disabled={uploading}
-            onChange={onFileSelected}
-          />
-        </label>
+        {photos.length < MAX_PHOTOS && (
+          <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-zinc-300 text-zinc-400 hover:border-brand hover:text-brand">
+            <span className="text-2xl">{uploading ? "…" : "+"}</span>
+            <span className="text-xs">
+              {photos.length === 0 ? "צילום ראשי" : "הוספת תמונה"}
+            </span>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              disabled={uploading}
+              onChange={onFileSelected}
+            />
+          </label>
+        )}
       </div>
+      {photos.length >= MAX_PHOTOS && (
+        <p className="mt-2 text-center text-xs text-zinc-400">
+          הגעתם למספר המרבי של {MAX_PHOTOS} תמונות
+        </p>
+      )}
     </div>
   );
 }

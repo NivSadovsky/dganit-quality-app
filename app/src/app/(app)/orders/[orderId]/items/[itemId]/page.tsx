@@ -49,6 +49,22 @@ export default async function InspectionItemPage({
               הורדת דוח PDF
             </a>
           )}
+          <div className="mt-4 flex flex-col items-center gap-2 border-t border-zinc-100 pt-4">
+            {inspection.pdfUrlEn && (
+              <a
+                href={fileUrl(inspection.pdfUrlEn, `quality-report-${inspection.serialNumber}-en.pdf`)}
+                className="text-sm font-medium text-brand underline"
+              >
+                הורדת דוח באנגלית
+              </a>
+            )}
+            <Link
+              href={`/orders/${orderItem.purchaseOrderId}/items/${itemId}/translate`}
+              className="text-sm text-zinc-500 underline"
+            >
+              {inspection.pdfUrlEn ? "עריכת תרגום / יצירה מחדש" : "תרגום לאנגלית"}
+            </Link>
+          </div>
         </div>
       </div>
     );
