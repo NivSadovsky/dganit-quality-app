@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { deleteFile } from "@/lib/storage";
 import { ITEM_DECISIONS } from "@/lib/constants";
 
 const decisionSchema = z.enum(ITEM_DECISIONS);
@@ -104,4 +106,47 @@ export async function deleteOrderItem(itemId: string) {
 
   await db.orderItem.delete({ where: { id: itemId } });
   revalidatePath(`/orders/${item.purchaseOrderId}`);
+}
+
+// Deletes an entire order and everything under it — including already
+// closed inspections and their reports — for cases where the order itself
+// was entered wrong. Unlike deleteOrderItem this is not blocked by closed
+// inspections; it's a stronger, explicit "undo this whole order" action.
+export async function deletePurchaseOrder(purchaseOrderId: string) {
+  await requireUser();
+
+  const order = await db.purchaseOrder.findUniqueOrThrow({
+    where: { id: purchaseOrderId },
+    include: {
+      items: {
+        include: {
+          inspections: {
+            include: { photos: true },
+          },
+        },
+      },
+    },
+  });
+
+  const filesToDelete: string[] = [order.sourceFileName];
+  for (const item of order.items) {
+    for (const inspection of item.inspections) {
+      if (inspection.pdfUrl) filesToDelete.push(inspection.pdfUrl);
+      if (inspection.pdfUrlEn) filesToDelete.push(inspection.pdfUrlEn);
+      for (const photo of inspection.photos) filesToDelete.push(photo.url);
+    }
+  }
+
+  await db.$transaction(async (tx) => {
+    for (const item of order.items) {
+      await tx.inspection.deleteMany({ where: { orderItemId: item.id } });
+    }
+    await tx.orderItem.deleteMany({ where: { purchaseOrderId } });
+    await tx.purchaseOrder.delete({ where: { id: purchaseOrderId } });
+  });
+
+  await Promise.all(filesToDelete.map((f) => deleteFile(f)));
+
+  revalidatePath("/orders");
+  redirect("/orders");
 }

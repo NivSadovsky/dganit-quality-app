@@ -1,10 +1,37 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { OrdersList, type OrderListRow } from "./OrdersList";
+
+function formatDate(d: Date) {
+  return new Intl.DateTimeFormat("he-IL").format(d);
+}
 
 export default async function OrdersPage() {
   const orders = await db.purchaseOrder.findMany({
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { items: true } } },
+    include: {
+      _count: { select: { items: true } },
+      items: { select: { inspections: { select: { inspectionDate: true } } } },
+    },
+  });
+
+  // Per-order inspection date shown on this screen = the day the first
+  // inspection in the order was actually started, i.e. the earliest
+  // inspectionDate across all of the order's items.
+  const rows: OrderListRow[] = orders.map((order) => {
+    const dates = order.items
+      .flatMap((item) => item.inspections)
+      .map((i) => i.inspectionDate)
+      .filter((d): d is Date => d !== null);
+    const minDate = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))) : null;
+
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      containerNumber: order.containerNumber,
+      itemCount: order._count.items,
+      inspectionDate: minDate ? formatDate(minDate) : null,
+    };
   });
 
   return (
@@ -19,29 +46,13 @@ export default async function OrdersPage() {
         </Link>
       </div>
 
-      {orders.length === 0 && (
+      {orders.length === 0 ? (
         <p className="rounded-2xl bg-white p-6 text-center text-sm text-zinc-500 ring-1 ring-zinc-200">
           אין עדיין הזמנות במערכת. ניתן לייבא הזמנת רכש חדשה.
         </p>
+      ) : (
+        <OrdersList orders={rows} />
       )}
-
-      <div className="flex flex-col gap-2">
-        {orders.map((order) => (
-          <Link
-            key={order.id}
-            href={`/orders/${order.id}`}
-            className="flex items-center justify-between rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200 hover:ring-brand"
-          >
-            <div>
-              <p className="font-medium">הזמנה {order.orderNumber}</p>
-              {order.containerNumber && (
-                <p className="text-xs text-zinc-500">מכולה: {order.containerNumber}</p>
-              )}
-            </div>
-            <span className="text-xs text-zinc-400">{order._count.items} פריטים</span>
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

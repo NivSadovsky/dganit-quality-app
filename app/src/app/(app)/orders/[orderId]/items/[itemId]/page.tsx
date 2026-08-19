@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getOrCreateInspectionForItem, inspectionInclude } from "@/lib/inspections";
+import { getExistingInspectionForItem } from "@/lib/inspections";
 import { db } from "@/lib/db";
 import { fileUrl } from "@/lib/storage";
+import { CHECK_SECTIONS, CHECK_SECTION_LABELS_HE, type ProductType } from "@/lib/constants";
 import { GeneralDetailsCard } from "./GeneralDetailsCard";
 import { SampleDetailsCard } from "./SampleDetailsCard";
 import { CheckSection } from "./CheckSection";
@@ -12,25 +13,21 @@ import { FindingsList } from "./FindingsList";
 import { PhotoGallery } from "./PhotoGallery";
 import { ConclusionsCard } from "./ConclusionsCard";
 import { CloseInspectionButton } from "./CloseInspectionButton";
+import { ProductTypeSelect } from "./ProductTypeSelect";
 
 export default async function InspectionItemPage({
   params,
 }: PageProps<"/orders/[orderId]/items/[itemId]">) {
   const { itemId } = await params;
-  const user = await requireUser();
+  await requireUser();
 
   const orderItem = await db.orderItem.findUnique({ where: { id: itemId } });
   if (!orderItem) notFound();
 
-  // Prefer an already-closed inspection for this item if one exists, so a
-  // second visit shows the final report instead of silently opening a new one.
-  const closed = await db.inspection.findFirst({
-    where: { orderItemId: itemId, status: "CLOSED" },
-    orderBy: { createdAt: "desc" },
-    include: inspectionInclude,
-  });
-
-  const inspection = closed ?? (await getOrCreateInspectionForItem(itemId, user.id));
+  const inspection = await getExistingInspectionForItem(itemId);
+  if (!inspection) {
+    return <ProductTypeSelect itemId={itemId} description={orderItem.description} />;
+  }
 
   if (inspection.status === "CLOSED") {
     return (
@@ -89,26 +86,25 @@ export default async function InspectionItemPage({
       <GeneralDetailsCard inspection={inspection} />
       <SampleDetailsCard inspection={inspection} />
 
-      <CheckSection
-        inspectionId={inspection.id}
-        section="PACKAGING"
-        title="אריזה"
-        rows={inspection.checkItems.filter((c) => c.section === "PACKAGING")}
-      />
-      <CheckSection
-        inspectionId={inspection.id}
-        section="VISUAL"
-        title="בדיקה ויזואלית מארז"
-        rows={inspection.checkItems.filter((c) => c.section === "VISUAL")}
-      />
-      <CheckSection
-        inspectionId={inspection.id}
-        section="PRODUCT"
-        title="תוצאות בדיקת המוצר"
-        rows={inspection.checkItems.filter((c) => c.section === "PRODUCT")}
-      />
+      {CHECK_SECTIONS.map((section) => {
+        const rows = inspection.checkItems.filter((c) => c.section === section);
+        if (rows.length === 0) return null;
+        return (
+          <CheckSection
+            key={section}
+            inspectionId={inspection.id}
+            section={section}
+            title={CHECK_SECTION_LABELS_HE[section]}
+            rows={rows}
+          />
+        );
+      })}
 
-      <MeasurementsTable inspectionId={inspection.id} rows={inspection.measurements} />
+      <MeasurementsTable
+        inspectionId={inspection.id}
+        productType={inspection.productType as ProductType}
+        rows={inspection.measurements}
+      />
       <FindingsList inspectionId={inspection.id} findings={inspection.findings} />
       <PhotoGallery inspectionId={inspection.id} photos={inspection.photos} />
       <ConclusionsCard inspectionId={inspection.id} conclusions={inspection.conclusions} />

@@ -97,13 +97,21 @@ model Inspection {
   inspectorId String
   inspector   User   @relation(fields: [inspectorId], references: [id])
 
+  // Which check-item/measurement template this inspection uses — chosen
+  // once, before the inspection starts (see startInspection in
+  // src/lib/inspections.ts). MICROFIBER | FABRIC | SCRUBBER
+  productType String @default("MICROFIBER")
+
   // General details — snapshotted at inspection time so the printed report
   // stays stable even if master/PO data changes later.
-  productDescription String
-  itemCodeSadovsky   String?
-  specDimensions     String?
-  specWeight         String?
-  orderOrContainer   String?
+  productDescription   String
+  productDescriptionEn String? // manual English translation, see translate screen
+  itemCodeSadovsky     String?
+  specDimensions       String?
+  specWeight           String?
+  orderOrContainer     String?
+  supplierName         String? // שם ספק
+  inspectionDate       DateTime? // day the inspection was actually performed — set when first opened, editable
 
   // Sample details
   qtyToInspect     Int?
@@ -144,14 +152,24 @@ model InspectionCheckItem {
   inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 }
 
-// מידות ומשקלים — dynamic rows, one per sampled unit
+// מידות ומשקלים — dynamic rows, one per sampled unit. Columns shown depend
+// on Inspection.productType (see MEASUREMENT_COLUMNS in constants.ts) —
+// each product type only uses a subset of these, left null otherwise.
 model InspectionMeasurement {
   id          String  @id @default(cuid())
   order       Int
-  unitWeightG Float?
-  widthCm     Float?
-  lengthCm    Float?
-  color       String?
+  unitWeightG Float? // MICROFIBER, FABRIC
+  widthCm     Float? // MICROFIBER, SCRUBBER, FABRIC (fabric width)
+  lengthCm    Float? // MICROFIBER, SCRUBBER
+  color       String? // MICROFIBER, SCRUBBER
+
+  clothWeightG Float? // SCRUBBER — משקל הבד
+  padWeightG   Float? // SCRUBBER — משקל כרית
+  thicknessCm  Float? // SCRUBBER — עובי
+
+  rollWeightG           Float?  // FABRIC — משקל גליל
+  threadThicknessMicron Float?  // FABRIC — עובי חוט
+  fabricType            String? // FABRIC — סוג הבד
 
   inspectionId String
   inspection   Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)

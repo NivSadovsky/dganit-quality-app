@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { fileUrl } from "@/lib/storage";
 import { ItemRow } from "./ItemRow";
 import { AddItemForm } from "./AddItemForm";
+import { DeleteOrderButton } from "./DeleteOrderButton";
 
 export default async function OrderPage({
   params,
@@ -57,6 +58,8 @@ export default async function OrderPage({
         ))}
         <AddItemForm purchaseOrderId={order.id} />
       </div>
+
+      <DeleteOrderButton purchaseOrderId={order.id} />
     </div>
   );
 }

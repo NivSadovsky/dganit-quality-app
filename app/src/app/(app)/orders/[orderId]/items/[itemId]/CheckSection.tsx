@@ -29,7 +29,7 @@ export function CheckSection({
 function CheckRow({ row }: { row: InspectionCheckItem }) {
   const [pending, startTransition] = useTransition();
 
-  const setResult = (result: "OK" | "NOT_OK") => {
+  const setResult = (result: "OK" | "NOT_OK" | "NOT_RELEVANT") => {
     startTransition(() =>
       updateCheckItem(row.id, { result: result === row.result ? "NA" : result })
     );
@@ -57,6 +57,15 @@ function CheckRow({ row }: { row: InspectionCheckItem }) {
             }`}
           >
             לא תקין
+          </button>
+          <button
+            disabled={pending}
+            onClick={() => setResult("NOT_RELEVANT")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
+              row.result === "NOT_RELEVANT" ? "bg-zinc-500 text-white" : "bg-zinc-100 text-zinc-700"
+            }`}
+          >
+            לא רלוונטי
           </button>
         </div>
       </div>

@@ -17,10 +17,13 @@ import {
   CHECK_SECTION_LABELS_HE,
   CHECK_ROW_LABELS_EN,
   CHECK_RESULT_LABELS_EN,
+  CHECK_RESULT_LABELS_HE,
   SEVERITY_LABELS_HE,
   SEVERITY_LABELS_EN,
   colorLabelEn,
+  MEASUREMENT_COLUMNS,
   type CheckSection,
+  type ProductType,
 } from "@/lib/constants";
 
 const FONTS_DIR = join(process.cwd(), "src/lib/pdf/fonts");
@@ -37,7 +40,13 @@ const styles = StyleSheet.create({
   page: { padding: 28, fontFamily: "Heebo", fontSize: 9, direction: "rtl", textAlign: "right" },
   pageEn: { padding: 28, fontFamily: "Heebo", fontSize: 9, direction: "ltr", textAlign: "left" },
   headerRow: {
-    flexDirection: "row",
+    // react-pdf's Yoga layout mirrors flexDirection based on the page's
+    // `direction` — plain "row" on an rtl page puts the first JSX child
+    // (the logo) on the right and the second (title block) on the left,
+    // which is backwards for a Hebrew report. row-reverse corrects it here
+    // and, by the same mirroring, also gives the desired logo-right /
+    // title-left layout on the ltr English page — see renderInspectionEnglishPdf.
+    flexDirection: "row-reverse",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
@@ -94,6 +103,7 @@ const styles = StyleSheet.create({
   },
   tdOk: { backgroundColor: "#e8f5e9", textAlign: "center", fontWeight: "bold", color: "#2e7d32" },
   tdNotOk: { backgroundColor: "#ffebee", textAlign: "center", fontWeight: "bold", color: "#c62828" },
+  tdNa: { backgroundColor: "#f4f4f5", textAlign: "center", fontWeight: "bold", color: "#71717a" },
   td: {
     flex: 1,
     borderRight: "0.5pt solid #ccc",
@@ -175,6 +185,7 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
     ...p,
     absPath: storageAbsPath(p.url),
   }));
+  const measurementColumns = MEASUREMENT_COLUMNS[inspection.productType as ProductType];
 
   const doc = (
     <Document title={`דוח בקרת איכות ${inspection.serialNumber}`} author="Sadovsky Ltd">
@@ -196,7 +207,12 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
           <KV label="מידות לפי מפרט" value={inspection.specDimensions} />
           <KV label="משקל לפי מפרט" value={inspection.specWeight} />
           <KV label="מספר הזמנה / מכולה" value={inspection.orderOrContainer} />
+          <KV label="שם ספק" value={inspection.supplierName} />
           <KV label="שם הבודק/ת" value={inspection.inspector.name} />
+          <KV
+            label="תאריך בדיקה"
+            value={inspection.inspectionDate ? formatDate(inspection.inspectionDate) : null}
+          />
         </View>
 
         <Text style={styles.sectionTitle}>פרטי המדגם</Text>
@@ -216,8 +232,9 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
               <View style={styles.table}>
                 <View style={styles.tr}>
                   <Text style={[styles.th, styles.tdLabel]}></Text>
-                  <Text style={styles.th}>תקין</Text>
-                  <Text style={styles.th}>לא תקין</Text>
+                  <Text style={styles.th}>{CHECK_RESULT_LABELS_HE.OK}</Text>
+                  <Text style={styles.th}>{CHECK_RESULT_LABELS_HE.NOT_OK}</Text>
+                  <Text style={styles.th}>{CHECK_RESULT_LABELS_HE.NOT_RELEVANT}</Text>
                   <Text style={[styles.th, { flex: 2 }]}>הערות</Text>
                 </View>
                 {rows.map((row) => (
@@ -228,6 +245,9 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
                     </Text>
                     <Text style={[styles.td, row.result === "NOT_OK" ? styles.tdNotOk : {}]}>
                       {row.result === "NOT_OK" ? "X" : ""}
+                    </Text>
+                    <Text style={[styles.td, row.result === "NOT_RELEVANT" ? styles.tdNa : {}]}>
+                      {row.result === "NOT_RELEVANT" ? "—" : ""}
                     </Text>
                     <Text style={[styles.td, { flex: 2 }]}>{pdfSafe(row.note)}</Text>
                   </View>
@@ -242,17 +262,19 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
             <Text style={styles.sectionTitle}>מידות ומשקלים</Text>
             <View style={styles.table}>
               <View style={styles.tr}>
-                <Text style={styles.th}>משקל יחידה (g)</Text>
-                <Text style={styles.th}>רוחב (cm)</Text>
-                <Text style={styles.th}>אורך (cm)</Text>
-                <Text style={styles.th}>צבע</Text>
+                {measurementColumns.map((col) => (
+                  <Text style={styles.th} key={col.key}>
+                    {col.labelHe}
+                  </Text>
+                ))}
               </View>
               {inspection.measurements.map((m) => (
                 <View style={styles.tr} key={m.id}>
-                  <Text style={styles.td}>{m.unitWeightG ?? ""}</Text>
-                  <Text style={styles.td}>{m.widthCm ?? ""}</Text>
-                  <Text style={styles.td}>{m.lengthCm ?? ""}</Text>
-                  <Text style={styles.td}>{pdfSafe(m.color)}</Text>
+                  {measurementColumns.map((col) => (
+                    <Text style={styles.td} key={col.key}>
+                      {pdfSafe(String(m[col.key] ?? ""))}
+                    </Text>
+                  ))}
                 </View>
               ))}
             </View>
@@ -313,11 +335,12 @@ export async function renderInspectionEnglishPdf(inspection: InspectionFull): Pr
     ...p,
     absPath: storageAbsPath(p.url),
   }));
+  const measurementColumns = MEASUREMENT_COLUMNS[inspection.productType as ProductType];
 
   const doc = (
     <Document title={`Quality Control Report ${inspection.serialNumber}`} author="Sadovsky Ltd">
       <Page size="A4" style={styles.pageEn} wrap>
-        <View style={[styles.headerRow, { flexDirection: "row-reverse" }]}>
+        <View style={styles.headerRow}>
           {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image src={logoPath} style={styles.logo} />
           <View>
@@ -329,12 +352,22 @@ export async function renderInspectionEnglishPdf(inspection: InspectionFull): Pr
 
         <Text style={styles.sectionTitleEn}>General Details</Text>
         <View style={styles.kvGrid}>
-          <KV label="Product description" value={inspection.productDescription} ltr />
+          <KV
+            label="Product description"
+            value={inspection.productDescriptionEn || inspection.productDescription}
+            ltr
+          />
           <KV label="SKU" value={inspection.itemCodeSadovsky} ltr />
           <KV label="Spec dimensions" value={inspection.specDimensions} ltr />
           <KV label="Spec weight" value={inspection.specWeight} ltr />
           <KV label="Order / container number" value={inspection.orderOrContainer} ltr />
+          <KV label="Supplier" value={inspection.supplierName} ltr />
           <KV label="Inspector" value={inspection.inspectorNameEn || inspection.inspector.name} ltr />
+          <KV
+            label="Inspection date"
+            value={inspection.inspectionDate ? formatDate(inspection.inspectionDate) : null}
+            ltr
+          />
         </View>
 
         <Text style={styles.sectionTitleEn}>Sample Details</Text>
@@ -361,6 +394,7 @@ export async function renderInspectionEnglishPdf(inspection: InspectionFull): Pr
                   <Text style={[styles.thEn, styles.tdLabel]}></Text>
                   <Text style={styles.thEn}>{CHECK_RESULT_LABELS_EN.OK}</Text>
                   <Text style={styles.thEn}>{CHECK_RESULT_LABELS_EN.NOT_OK}</Text>
+                  <Text style={styles.thEn}>{CHECK_RESULT_LABELS_EN.NOT_RELEVANT}</Text>
                   <Text style={[styles.thEn, { flex: 2 }]}>Notes</Text>
                 </View>
                 {rows.map((row) => (
@@ -373,6 +407,9 @@ export async function renderInspectionEnglishPdf(inspection: InspectionFull): Pr
                     </Text>
                     <Text style={[styles.tdEn, row.result === "NOT_OK" ? styles.tdNotOk : {}]}>
                       {row.result === "NOT_OK" ? "X" : ""}
+                    </Text>
+                    <Text style={[styles.tdEn, row.result === "NOT_RELEVANT" ? styles.tdNa : {}]}>
+                      {row.result === "NOT_RELEVANT" ? "—" : ""}
                     </Text>
                     <Text style={[styles.tdEn, { flex: 2 }]}>{pdfSafe(row.noteEn || row.note)}</Text>
                   </View>
@@ -387,17 +424,21 @@ export async function renderInspectionEnglishPdf(inspection: InspectionFull): Pr
             <Text style={styles.sectionTitleEn}>Measurements</Text>
             <View style={styles.table}>
               <View style={styles.tr}>
-                <Text style={styles.thEn}>Unit weight (g)</Text>
-                <Text style={styles.thEn}>Width (cm)</Text>
-                <Text style={styles.thEn}>Length (cm)</Text>
-                <Text style={styles.thEn}>Color</Text>
+                {measurementColumns.map((col) => (
+                  <Text style={styles.thEn} key={col.key}>
+                    {col.labelEn}
+                  </Text>
+                ))}
               </View>
               {inspection.measurements.map((m) => (
                 <View style={styles.tr} key={m.id}>
-                  <Text style={styles.tdEn}>{m.unitWeightG ?? ""}</Text>
-                  <Text style={styles.tdEn}>{m.widthCm ?? ""}</Text>
-                  <Text style={styles.tdEn}>{m.lengthCm ?? ""}</Text>
-                  <Text style={styles.tdEn}>{colorLabelEn(m.color)}</Text>
+                  {measurementColumns.map((col) => (
+                    <Text style={styles.tdEn} key={col.key}>
+                      {col.kind === "color"
+                        ? colorLabelEn(m[col.key] as string | null)
+                        : pdfSafe(String(m[col.key] ?? ""))}
+                    </Text>
+                  ))}
                 </View>
               ))}
             </View>

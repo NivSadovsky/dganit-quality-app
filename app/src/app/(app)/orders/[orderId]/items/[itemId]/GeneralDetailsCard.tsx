@@ -10,7 +10,13 @@ const FIELDS: { name: keyof InspectionFull & string; label: string }[] = [
   { name: "specDimensions", label: "מידות לפי מפרט" },
   { name: "specWeight", label: "משקל לפי מפרט" },
   { name: "orderOrContainer", label: "מספר הזמנה / מכולה" },
+  { name: "supplierName", label: "שם ספק" },
 ];
+
+function toDateInputValue(d: Date | string | null): string {
+  if (!d) return "";
+  return new Date(d).toISOString().slice(0, 10);
+}
 
 export function GeneralDetailsCard({ inspection }: { inspection: InspectionFull }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -36,6 +42,15 @@ export function GeneralDetailsCard({ inspection }: { inspection: InspectionFull 
             />
           </label>
         ))}
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-zinc-500">תאריך בדיקה</span>
+          <input
+            name="inspectionDate"
+            type="date"
+            defaultValue={toDateInputValue(inspection.inspectionDate)}
+            className="rounded-lg border border-zinc-300 px-3 py-2"
+          />
+        </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-zinc-500">שם הבודק/ת</span>
           <input

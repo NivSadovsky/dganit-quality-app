@@ -3,54 +3,74 @@
 import { useTransition } from "react";
 import type { InspectionMeasurement } from "@/generated/prisma/client";
 import { addMeasurementRow, updateMeasurementRow, deleteMeasurementRow } from "./actions";
-import { MEASUREMENT_COLORS } from "@/lib/constants";
+import { MEASUREMENT_COLORS, MEASUREMENT_COLUMNS, type ProductType } from "@/lib/constants";
 
 export function MeasurementsTable({
   inspectionId,
+  productType,
   rows,
 }: {
   inspectionId: string;
+  productType: ProductType;
   rows: InspectionMeasurement[];
 }) {
   const [pending, startTransition] = useTransition();
+  const columns = MEASUREMENT_COLUMNS[productType];
 
   return (
     <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200">
       <h2 className="mb-3 font-bold text-brand">מידות ומשקלים</h2>
       <div className="flex flex-col gap-2">
         {rows.map((row) => (
-          <div key={row.id} className="grid grid-cols-5 items-center gap-1.5">
-            <NumInput
-              placeholder="משקל (g)"
-              defaultValue={row.unitWeightG}
-              onSave={(v) => updateMeasurementRow(row.id, { unitWeightG: v })}
-            />
-            <NumInput
-              placeholder="רוחב (cm)"
-              defaultValue={row.widthCm}
-              onSave={(v) => updateMeasurementRow(row.id, { widthCm: v })}
-            />
-            <NumInput
-              placeholder="אורך (cm)"
-              defaultValue={row.lengthCm}
-              onSave={(v) => updateMeasurementRow(row.id, { lengthCm: v })}
-            />
-            <select
-              defaultValue={row.color ?? ""}
-              onChange={(e) =>
-                startTransition(() =>
-                  updateMeasurementRow(row.id, { color: e.target.value || null })
-                )
-              }
-              className="rounded-lg border border-zinc-300 px-2 py-1.5 text-xs"
-            >
-              <option value="">צבע</option>
-              {MEASUREMENT_COLORS.map((c) => (
-                <option key={c.he} value={c.he}>
-                  {c.he}
-                </option>
-              ))}
-            </select>
+          <div key={row.id} className="grid items-center gap-1.5" style={{ gridTemplateColumns: `repeat(${columns.length + 1}, minmax(0, 1fr))` }}>
+            {columns.map((col) =>
+              col.kind === "color" ? (
+                <select
+                  key={col.key}
+                  defaultValue={row[col.key] ?? ""}
+                  onChange={(e) =>
+                    startTransition(() =>
+                      updateMeasurementRow(row.id, {
+                        [col.key]: e.target.value || null,
+                      } as Parameters<typeof updateMeasurementRow>[1])
+                    )
+                  }
+                  className="rounded-lg border border-zinc-300 px-2 py-1.5 text-xs"
+                >
+                  <option value="">צבע</option>
+                  {MEASUREMENT_COLORS.map((c) => (
+                    <option key={c.he} value={c.he}>
+                      {c.he}
+                    </option>
+                  ))}
+                </select>
+              ) : col.kind === "text" ? (
+                <input
+                  key={col.key}
+                  placeholder={col.labelHe}
+                  defaultValue={row[col.key] ?? ""}
+                  onBlur={(e) =>
+                    startTransition(() =>
+                      updateMeasurementRow(row.id, {
+                        [col.key]: e.target.value || null,
+                      } as Parameters<typeof updateMeasurementRow>[1])
+                    )
+                  }
+                  className="rounded-lg border border-zinc-300 px-2 py-1.5 text-xs"
+                />
+              ) : (
+                <NumInput
+                  key={col.key}
+                  placeholder={col.labelHe}
+                  defaultValue={row[col.key] as number | null}
+                  onSave={(v) =>
+                    updateMeasurementRow(row.id, {
+                      [col.key]: v,
+                    } as Parameters<typeof updateMeasurementRow>[1])
+                  }
+                />
+              )
+            )}
             <button
               disabled={pending}
               onClick={() => startTransition(() => deleteMeasurementRow(row.id))}

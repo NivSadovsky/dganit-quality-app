@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, unlink } from "fs/promises";
 import { join, dirname, resolve } from "path";
 
 // resolve() (not join()) so an absolute STORAGE_DIR — e.g. "/data" for the
@@ -15,6 +15,17 @@ export async function saveFile(relPath: string, data: Buffer): Promise<string> {
 
 export function storageAbsPath(relPath: string): string {
   return join(STORAGE_ROOT, relPath);
+}
+
+// Best-effort — used when deleting a whole order so old files don't pile up
+// forever on the volume. Never throws: a file that's already gone (or was
+// never written) shouldn't block the DB deletion it's cleaning up after.
+export async function deleteFile(relPath: string): Promise<void> {
+  try {
+    await unlink(storageAbsPath(relPath));
+  } catch {
+    // ignore
+  }
 }
 
 export { fileUrl } from "@/lib/fileUrl";

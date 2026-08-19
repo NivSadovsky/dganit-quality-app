@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { DEFAULT_CHECK_ROWS } from "@/lib/inspectionTemplate";
+import { CHECK_ROWS_BY_TYPE } from "@/lib/inspectionTemplate";
+import type { ProductType } from "@/lib/constants";
 
 export const inspectionInclude = {
   checkItems: { orderBy: { order: "asc" as const } },
@@ -10,13 +11,24 @@ export const inspectionInclude = {
   inspector: true,
 };
 
-export async function getOrCreateInspectionForItem(orderItemId: string, inspectorId: string) {
-  const existing = await db.inspection.findFirst({
-    where: { orderItemId, status: "OPEN" },
+// Returns the item's existing open/closed inspection, or null if the
+// inspector still needs to pick a product type (see startInspection).
+export async function getExistingInspectionForItem(orderItemId: string) {
+  return db.inspection.findFirst({
+    where: { orderItemId },
+    orderBy: { createdAt: "desc" },
     include: inspectionInclude,
   });
-  if (existing) return existing;
+}
 
+// Creates the inspection once the inspector has chosen which product-type
+// template applies (microfiber/fabric/scrubber) — see
+// src/lib/inspectionTemplate.ts for the row sets this seeds.
+export async function startInspection(
+  orderItemId: string,
+  inspectorId: string,
+  productType: ProductType
+) {
   const item = await db.orderItem.findUniqueOrThrow({
     where: { id: orderItemId },
     include: { purchaseOrder: true, productMaster: true },
@@ -35,6 +47,8 @@ export async function getOrCreateInspectionForItem(orderItemId: string, inspecto
         serialNumber,
         orderItemId: item.id,
         inspectorId,
+        productType,
+        inspectionDate: new Date(),
         productDescription: item.description,
         itemCodeSadovsky: item.productMaster?.itemCodeSadovsky ?? null,
         specDimensions: item.productMaster?.specDimensions ?? null,
@@ -43,7 +57,7 @@ export async function getOrCreateInspectionForItem(orderItemId: string, inspecto
         qtyInOrder: item.quantity,
         customerItemCode: item.productMaster?.customerItemCode ?? null,
         checkItems: {
-          create: DEFAULT_CHECK_ROWS.map((row, i) => ({
+          create: CHECK_ROWS_BY_TYPE[productType].map((row, i) => ({
             order: i,
             section: row.section,
             label: row.label,
@@ -56,4 +70,4 @@ export async function getOrCreateInspectionForItem(orderItemId: string, inspecto
   return db.inspection.findUniqueOrThrow({ where: { id: inspection.id }, include: inspectionInclude });
 }
 
-export type InspectionFull = Awaited<ReturnType<typeof getOrCreateInspectionForItem>>;
+export type InspectionFull = Awaited<ReturnType<typeof startInspection>>;

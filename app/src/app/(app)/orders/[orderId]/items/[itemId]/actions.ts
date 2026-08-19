@@ -1,13 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { saveFile } from "@/lib/storage";
-import { CHECK_RESULTS, SEVERITIES } from "@/lib/constants";
+import { CHECK_RESULTS, SEVERITIES, PRODUCT_TYPES } from "@/lib/constants";
 import { renderInspectionPdf, renderInspectionEnglishPdf } from "@/lib/pdf/renderInspectionPdf";
-import { inspectionInclude } from "@/lib/inspections";
+import { inspectionInclude, startInspection } from "@/lib/inspections";
 
 async function revalidateInspection(inspectionId: string) {
   const inspection = await db.inspection.findUnique({
@@ -21,6 +22,19 @@ async function revalidateInspection(inspectionId: string) {
   }
 }
 
+// ---- start inspection (product-type selection) ---------------------------
+
+export async function startInspectionAction(formData: FormData) {
+  const user = await requireUser();
+  const itemId = formData.get("itemId") as string;
+  const productType = z.enum(PRODUCT_TYPES).parse(formData.get("productType"));
+
+  const item = await db.orderItem.findUniqueOrThrow({ where: { id: itemId } });
+  await startInspection(itemId, user.id, productType);
+  revalidatePath(`/orders/${item.purchaseOrderId}/items/${itemId}`);
+  redirect(`/orders/${item.purchaseOrderId}/items/${itemId}`);
+}
+
 // ---- general / sample details -------------------------------------------
 
 const generalSchema = z.object({
@@ -29,11 +43,14 @@ const generalSchema = z.object({
   specDimensions: z.string().trim().optional(),
   specWeight: z.string().trim().optional(),
   orderOrContainer: z.string().trim().optional(),
+  supplierName: z.string().trim().optional(),
+  inspectionDate: z.coerce.date().optional(),
 });
 
 export async function updateGeneralDetails(inspectionId: string, formData: FormData) {
   await requireUser();
-  const parsed = generalSchema.parse(Object.fromEntries(formData));
+  const raw = Object.fromEntries(formData);
+  const parsed = generalSchema.parse({ ...raw, inspectionDate: raw.inspectionDate || undefined });
   await db.inspection.update({ where: { id: inspectionId }, data: parsed });
   await revalidateInspection(inspectionId);
 }
@@ -95,7 +112,18 @@ export async function addMeasurementRow(inspectionId: string) {
 
 export async function updateMeasurementRow(
   rowId: string,
-  data: { unitWeightG?: number | null; widthCm?: number | null; lengthCm?: number | null; color?: string | null }
+  data: {
+    unitWeightG?: number | null;
+    widthCm?: number | null;
+    lengthCm?: number | null;
+    color?: string | null;
+    clothWeightG?: number | null;
+    padWeightG?: number | null;
+    thicknessCm?: number | null;
+    rollWeightG?: number | null;
+    threadThicknessMicron?: number | null;
+    fabricType?: string | null;
+  }
 ) {
   await requireUser();
   const row = await db.inspectionMeasurement.update({ where: { id: rowId }, data });
@@ -179,7 +207,7 @@ export async function deletePhoto(photoId: string) {
 
 export async function updateInspectionTranslation(
   inspectionId: string,
-  data: { inspectorNameEn?: string; conclusionsEn?: string }
+  data: { inspectorNameEn?: string; conclusionsEn?: string; productDescriptionEn?: string }
 ) {
   await requireUser();
   await db.inspection.update({
@@ -187,6 +215,9 @@ export async function updateInspectionTranslation(
     data: {
       ...(data.inspectorNameEn !== undefined ? { inspectorNameEn: data.inspectorNameEn } : {}),
       ...(data.conclusionsEn !== undefined ? { conclusionsEn: data.conclusionsEn } : {}),
+      ...(data.productDescriptionEn !== undefined
+        ? { productDescriptionEn: data.productDescriptionEn }
+        : {}),
     },
   });
   await revalidateInspection(inspectionId);
