@@ -54,6 +54,7 @@ export function TranslateForm({ inspection }: { inspection: InspectionFull }) {
   const missing =
     !inspection.productDescriptionEn?.trim() ||
     !inspection.inspectorNameEn?.trim() ||
+    (!!inspection.supplierName?.trim() && !inspection.supplierNameEn?.trim()) ||
     (!!inspection.conclusions?.trim() && !inspection.conclusionsEn?.trim()) ||
     notedCheckItems.some((c) => !c.noteEn?.trim()) ||
     inspection.findings.some((f) => !f.textEn?.trim());
@@ -77,6 +78,18 @@ export function TranslateForm({ inspection }: { inspection: InspectionFull }) {
           onSave={(v) => updateInspectionTranslation(inspection.id, { productDescriptionEn: v })}
         />
       </div>
+
+      {inspection.supplierName && (
+        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200">
+          <h2 className="mb-1 font-bold text-brand">שם ספק</h2>
+          <Row
+            heLabel="עברית"
+            heValue={inspection.supplierName}
+            defaultValue={inspection.supplierNameEn ?? ""}
+            onSave={(v) => updateInspectionTranslation(inspection.id, { supplierNameEn: v })}
+          />
+        </div>
+      )}
 
       <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200">
         <h2 className="mb-1 font-bold text-brand">שם הבודק/ת</h2>

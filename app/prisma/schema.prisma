@@ -111,6 +111,7 @@ model Inspection {
   specWeight           String?
   orderOrContainer     String?
   supplierName         String? // שם ספק
+  supplierNameEn       String? // manual English translation, see translate screen
   inspectionDate       DateTime? // day the inspection was actually performed — set when first opened, editable
 
   // Sample details

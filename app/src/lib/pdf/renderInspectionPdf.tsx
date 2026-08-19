@@ -361,7 +361,7 @@ export async function renderInspectionEnglishPdf(inspection: InspectionFull): Pr
           <KV label="Spec dimensions" value={inspection.specDimensions} ltr />
           <KV label="Spec weight" value={inspection.specWeight} ltr />
           <KV label="Order / container number" value={inspection.orderOrContainer} ltr />
-          <KV label="Supplier" value={inspection.supplierName} ltr />
+          <KV label="Supplier" value={inspection.supplierNameEn || inspection.supplierName} ltr />
           <KV label="Inspector" value={inspection.inspectorNameEn || inspection.inspector.name} ltr />
           <KV
             label="Inspection date"

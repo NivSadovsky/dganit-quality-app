@@ -207,7 +207,12 @@ export async function deletePhoto(photoId: string) {
 
 export async function updateInspectionTranslation(
   inspectionId: string,
-  data: { inspectorNameEn?: string; conclusionsEn?: string; productDescriptionEn?: string }
+  data: {
+    inspectorNameEn?: string;
+    conclusionsEn?: string;
+    productDescriptionEn?: string;
+    supplierNameEn?: string;
+  }
 ) {
   await requireUser();
   await db.inspection.update({
@@ -218,6 +223,7 @@ export async function updateInspectionTranslation(
       ...(data.productDescriptionEn !== undefined
         ? { productDescriptionEn: data.productDescriptionEn }
         : {}),
+      ...(data.supplierNameEn !== undefined ? { supplierNameEn: data.supplierNameEn } : {}),
     },
   });
   await revalidateInspection(inspectionId);
