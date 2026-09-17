@@ -242,10 +242,41 @@ export async function generateEnglishPdf(inspectionId: string) {
     pdfBuffer
   );
 
-  await db.inspection.update({ where: { id: inspectionId }, data: { pdfUrlEn: relPath } });
+  await db.inspection.update({
+    where: { id: inspectionId },
+    data: { pdfUrlEn: relPath, pdfGeneratedAt: new Date() },
+  });
   revalidatePath(
     `/orders/${inspection.orderItem.purchaseOrderId}/items/${inspection.orderItemId}/translate`
   );
+  revalidatePath(`/orders/${inspection.orderItem.purchaseOrderId}/items/${inspection.orderItemId}`);
+}
+
+// Re-renders the PDF(s) for an already-closed inspection with the current
+// template/code — for when a report-layout fix (e.g. alignment, photo
+// cropping) needs to reach inspections closed before the fix shipped,
+// without redoing the inspection itself. Regenerates the English PDF too
+// if one already exists, since it can carry the same stale layout.
+export async function regenerateInspectionPdf(inspectionId: string) {
+  await requireUser();
+  const inspection = await db.inspection.findUniqueOrThrow({
+    where: { id: inspectionId },
+    include: inspectionInclude,
+  });
+
+  const pdfBuffer = await renderInspectionPdf(inspection);
+  const relPath = await saveFile(`inspection-reports/${inspection.serialNumber}.pdf`, pdfBuffer);
+  const data: { pdfUrl: string; pdfUrlEn?: string; pdfGeneratedAt: Date } = {
+    pdfUrl: relPath,
+    pdfGeneratedAt: new Date(),
+  };
+
+  if (inspection.pdfUrlEn) {
+    const enBuffer = await renderInspectionEnglishPdf(inspection);
+    data.pdfUrlEn = await saveFile(`inspection-reports/${inspection.serialNumber}-en.pdf`, enBuffer);
+  }
+
+  await db.inspection.update({ where: { id: inspectionId }, data });
   revalidatePath(`/orders/${inspection.orderItem.purchaseOrderId}/items/${inspection.orderItemId}`);
 }
 
@@ -266,7 +297,7 @@ export async function closeInspection(inspectionId: string) {
 
   await db.inspection.update({
     where: { id: inspectionId },
-    data: { status: "CLOSED", closedAt: new Date(), pdfUrl: relPath },
+    data: { status: "CLOSED", closedAt: new Date(), pdfUrl: relPath, pdfGeneratedAt: new Date() },
   });
 
   revalidatePath(`/orders/${inspection.orderItem.purchaseOrderId}/items/${inspection.orderItemId}`);

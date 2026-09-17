@@ -128,8 +128,9 @@ model Inspection {
   inspectorNameEn String?
   conclusionsEn   String?
 
-  pdfUrl   String? // Hebrew report, set once closed
-  pdfUrlEn String? // English report, set once translated and generated
+  pdfUrl         String? // Hebrew report, set once closed
+  pdfUrlEn       String? // English report, set once translated and generated
+  pdfGeneratedAt DateTime? // bumped on every (re)generation — cache-busts the immutable /files URL
 
   checkItems   InspectionCheckItem[]
   measurements InspectionMeasurement[]

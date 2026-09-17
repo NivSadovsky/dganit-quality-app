@@ -14,6 +14,7 @@ import { PhotoGallery } from "./PhotoGallery";
 import { ConclusionsCard } from "./ConclusionsCard";
 import { CloseInspectionButton } from "./CloseInspectionButton";
 import { ProductTypeSelect } from "./ProductTypeSelect";
+import { RegenerateReportButton } from "./RegenerateReportButton";
 
 export default async function InspectionItemPage({
   params,
@@ -40,7 +41,11 @@ export default async function InspectionItemPage({
           <p className="mt-1 text-sm text-zinc-500">{inspection.productDescription}</p>
           {inspection.pdfUrl && (
             <a
-              href={fileUrl(inspection.pdfUrl, `בדיקת-איכות-${inspection.serialNumber}.pdf`)}
+              href={fileUrl(
+                inspection.pdfUrl,
+                `בדיקת-איכות-${inspection.serialNumber}.pdf`,
+                inspection.pdfGeneratedAt?.getTime()
+              )}
               className="mt-4 inline-block rounded-xl bg-brand px-5 py-2.5 font-semibold text-white"
             >
               הורדת דוח PDF
@@ -49,7 +54,11 @@ export default async function InspectionItemPage({
           <div className="mt-4 flex flex-col items-center gap-2 border-t border-zinc-100 pt-4">
             {inspection.pdfUrlEn && (
               <a
-                href={fileUrl(inspection.pdfUrlEn, `quality-report-${inspection.serialNumber}-en.pdf`)}
+                href={fileUrl(
+                  inspection.pdfUrlEn,
+                  `quality-report-${inspection.serialNumber}-en.pdf`,
+                  inspection.pdfGeneratedAt?.getTime()
+                )}
                 className="text-sm font-medium text-brand underline"
               >
                 הורדת דוח באנגלית
@@ -61,6 +70,7 @@ export default async function InspectionItemPage({
             >
               {inspection.pdfUrlEn ? "עריכת תרגום / יצירה מחדש" : "תרגום לאנגלית"}
             </Link>
+            <RegenerateReportButton inspectionId={inspection.id} />
           </div>
         </div>
       </div>

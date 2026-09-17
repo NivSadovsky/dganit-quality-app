@@ -11,6 +11,8 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import { join } from "path";
+import type { Style } from "@react-pdf/types";
+import { imageSizeFromFile } from "image-size/fromFile";
 import type { InspectionFull } from "@/lib/inspections";
 import { storageAbsPath } from "@/lib/storage";
 import {
@@ -122,8 +124,11 @@ const styles = StyleSheet.create({
   conclusions: { marginTop: 4, lineHeight: 1.4, textAlign: "right" },
   conclusionsEn: { marginTop: 4, lineHeight: 1.4, textAlign: "left" },
   photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
-  photoBox: { width: 150 },
-  photo: { width: 150, height: 150, objectFit: "cover", borderRadius: 4 },
+  photoGroupGap: { height: 14, width: "100%" },
+  photoBoxLandscape: { width: 170 },
+  photoLandscape: { width: 170, height: 128, objectFit: "contain" },
+  photoBoxPortrait: { width: 120 },
+  photoPortrait: { width: 120, height: 170, objectFit: "contain" },
   photoNote: { fontSize: 8, color: "#555", marginTop: 2 },
   footer: {
     position: "absolute",
@@ -158,6 +163,73 @@ function formatDate(d: Date) {
   return new Intl.DateTimeFormat("he-IL").format(d);
 }
 
+type PhotoWithPath = InspectionFull["photos"][number] & { absPath: string };
+
+// Grouped landscape-then-portrait (with a full-row gap between the two
+// groups) so photos of the same shape line up together instead of an
+// uneven mix — landscape photos get a wide/short box, portrait photos a
+// narrow/tall one, both using objectFit "contain" so the full photo shows
+// instead of being center-cropped to fill a fixed square.
+async function groupPhotosByOrientation(
+  photos: PhotoWithPath[]
+): Promise<{ landscape: PhotoWithPath[]; portrait: PhotoWithPath[] }> {
+  const landscape: PhotoWithPath[] = [];
+  const portrait: PhotoWithPath[] = [];
+  for (const photo of photos) {
+    let isLandscape = true;
+    try {
+      const { width, height } = await imageSizeFromFile(photo.absPath);
+      isLandscape = width >= height;
+    } catch {
+      // Unreadable dimensions (e.g. file missing) — default to landscape.
+    }
+    (isLandscape ? landscape : portrait).push(photo);
+  }
+  return { landscape, portrait };
+}
+
+function PhotosSection({
+  landscape,
+  portrait,
+  sectionTitleStyle,
+  sectionTitleText,
+}: {
+  landscape: PhotoWithPath[];
+  portrait: PhotoWithPath[];
+  sectionTitleStyle: Style;
+  sectionTitleText: string;
+}) {
+  if (landscape.length === 0 && portrait.length === 0) return null;
+  return (
+    <View>
+      <Text style={sectionTitleStyle}>{sectionTitleText}</Text>
+      {landscape.length > 0 && (
+        <View style={styles.photoGrid}>
+          {landscape.map((p) => (
+            <View key={p.id} style={styles.photoBoxLandscape}>
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={p.absPath} style={styles.photoLandscape} />
+              {p.note && <Text style={styles.photoNote}>{pdfSafe(p.note)}</Text>}
+            </View>
+          ))}
+        </View>
+      )}
+      {landscape.length > 0 && portrait.length > 0 && <View style={styles.photoGroupGap} />}
+      {portrait.length > 0 && (
+        <View style={styles.photoGrid}>
+          {portrait.map((p) => (
+            <View key={p.id} style={styles.photoBoxPortrait}>
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={p.absPath} style={styles.photoPortrait} />
+              {p.note && <Text style={styles.photoNote}>{pdfSafe(p.note)}</Text>}
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function SignatureBlock() {
   const logoPath = join(process.cwd(), "public", "logo.png");
   return (
@@ -185,6 +257,7 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
     ...p,
     absPath: storageAbsPath(p.url),
   }));
+  const { landscape, portrait } = await groupPhotosByOrientation(photos);
   const measurementColumns = MEASUREMENT_COLUMNS[inspection.productType as ProductType];
 
   const doc = (
@@ -304,20 +377,12 @@ export async function renderInspectionPdf(inspection: InspectionFull): Promise<B
         <Text style={styles.sectionTitle}>מסקנות</Text>
         <Text style={styles.conclusions}>{inspection.conclusions ? pdfSafe(inspection.conclusions) : "—"}</Text>
 
-        {photos.length > 0 && (
-          <View>
-            <Text style={styles.sectionTitle}>תמונות</Text>
-            <View style={styles.photoGrid}>
-              {photos.map((p) => (
-                <View key={p.id} style={styles.photoBox}>
-                  {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                  <Image src={p.absPath} style={styles.photo} />
-                  {p.note && <Text style={styles.photoNote}>{pdfSafe(p.note)}</Text>}
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
+        <PhotosSection
+          landscape={landscape}
+          portrait={portrait}
+          sectionTitleStyle={styles.sectionTitle}
+          sectionTitleText="תמונות"
+        />
 
         <SignatureBlock />
 
@@ -335,6 +400,7 @@ export async function renderInspectionEnglishPdf(inspection: InspectionFull): Pr
     ...p,
     absPath: storageAbsPath(p.url),
   }));
+  const { landscape, portrait } = await groupPhotosByOrientation(photos);
   const measurementColumns = MEASUREMENT_COLUMNS[inspection.productType as ProductType];
 
   const doc = (
@@ -470,20 +536,12 @@ export async function renderInspectionEnglishPdf(inspection: InspectionFull): Pr
           {inspection.conclusionsEn || inspection.conclusions || "—"}
         </Text>
 
-        {photos.length > 0 && (
-          <View>
-            <Text style={styles.sectionTitleEn}>Photos</Text>
-            <View style={styles.photoGrid}>
-              {photos.map((p) => (
-                <View key={p.id} style={styles.photoBox}>
-                  {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                  <Image src={p.absPath} style={styles.photo} />
-                  {p.note && <Text style={styles.photoNote}>{pdfSafe(p.note)}</Text>}
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
+        <PhotosSection
+          landscape={landscape}
+          portrait={portrait}
+          sectionTitleStyle={styles.sectionTitleEn}
+          sectionTitleText="Photos"
+        />
 
         <SignatureBlock />
 
